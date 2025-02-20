@@ -8,30 +8,42 @@
 import Foundation
 
 protocol ContentViewViewModelProtocol: ObservableObject {
-    func loadQuotes() async throws
+    var state: ContentViewViewModel.State { get }
+    func loadQuotes() async
 }
 
-@MainActor
 final class ContentViewViewModel: ContentViewViewModelProtocol {
+    enum State {
+        case idle
+        case loading
+        case error(Error)
+        case loaded([Quote])
+    }
+    
+    @Published private(set) var state: State = .idle
     private let networkManager: NetworkManagerProtocol
     
     init(networkManager: NetworkManagerProtocol) {
         self.networkManager = networkManager
     }
-    
-    func loadQuotes() async throws {
-        let departureFrom = Date().addingTimeInterval(30 * 60)
-        let departureTo = Date().endOfDay
-        
-        let response = try await networkManager.fetchQuotes(
-            origin: 13,
-            destination: 42,
-            departureDateFrom: departureFrom.iso8601String,
-            departureDateTo: departureTo.iso8601String
-        )
 
-        print("quotes are: \(response.quotes)")
-        // Handle quotes data here
+    @MainActor
+    func loadQuotes() async {
+        state = .loading
+        do {
+            let departureFrom = Date().addingTimeInterval(30 * 60)
+            let departureTo = Date().endOfDay
+
+            let response = try await networkManager.fetchQuotes(
+                origin: 13,
+                destination: 42,
+                departureDateFrom: departureFrom.iso8601String,
+                departureDateTo: departureTo.iso8601String
+            )
+            print("response.quotes.first?.price: \(response.quotes.first?.legs.first?.tripUid ?? "nil")")
+            state = .loaded(response.quotes)
+        } catch {
+            state = .error(error)
+        }
     }
 }
-

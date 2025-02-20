@@ -15,12 +15,32 @@ struct ContentView: View {
     }
 
     var body: some View {
-        Button("Load quotes") {
-            Task {
-                try? await viewModel.loadQuotes()
+        ZStack {
+            switch viewModel.state {
+            case .idle, .loading:
+                ProgressView()
+            case .error(let error):
+                Text(error.localizedDescription)
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .padding()
+            case .loaded(let quotes):
+                MapView(quotes: quotes, centerOnQuote: quotes.first)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .requireCapabilityPermission(of: .locationAccess) {
+            // On successful permission granted
+            Task {
+                await viewModel.loadQuotes()
+            }
+        } onCancel: {
+            // On permission denied
+            // Probably add error to logs, no need to bother the user
+        }
+        .task {
+            await viewModel.loadQuotes()
+        }
     }
 }
 

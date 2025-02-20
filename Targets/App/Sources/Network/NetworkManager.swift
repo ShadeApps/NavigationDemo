@@ -22,11 +22,15 @@ struct QuotesResponse: Codable {
     let quotes: [Quote]
 }
 
-struct Quote: Codable {
+struct Quote: Codable, Identifiable {
     let availability: Availability
     let legs: [Leg]
     let prices: Prices
     let bookable: Bool
+    
+    var id: String {
+        legs.first?.tripUid ?? UUID().uuidString
+    }
     
     struct Availability: Codable {
         let bicycle: Int?

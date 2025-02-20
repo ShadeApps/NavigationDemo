@@ -22,50 +22,40 @@ struct RequireCapabilityPermissionViewModifier: ViewModifier {
 	}
 
 	func body(content: Content) -> some View {
-		///Show the content, otherwise show RequestSheetContentView
-		if gotAccess {
-			content
-				.onAppearAndChange(of: scenePhase) {
+		Group {
+			if gotAccess {
+				content
+					.onAppearAndChange(of: scenePhase) {
+						if permissionRequirement == .appRating { return }
 
-					if permissionRequirement == .appRating { return }
-
-					Task {
-						let permissionStatus = await permissionRequirement.permissionStatus()
-
-						/// if we got permission, just show the content
-						if permissionStatus == .gotPermission {
-							gotAccess = true
-							return
-						}
-
-						/// If we got denied permission, prompt the user to give it in settings
-						if permissionStatus == .denied {
-							gotAccess = false
+						Task {
+							let permissionStatus = await permissionRequirement.permissionStatus()
+							
+							/// Update access state without animation
+							gotAccess = permissionStatus == .gotPermission
 						}
 					}
-				}
-				.transition(.opacity)
-
-		} else {
-			RequestCapabilityContentView(
-				type: permissionRequirement,
-				onSuccessfulAccept: {
-					withAnimation {
+			} else {
+				RequestCapabilityContentView(
+					type: permissionRequirement,
+					onSuccessfulAccept: {
 						gotAccess = true
 						onSuccess()
-					}
-				},
-				onDismiss: {
-					withAnimation {
-						onCancel()
-					}
+					},
+					onDismiss: onCancel
+				)
+				.navigationBarTitleDisplayMode(.inline)
+			}
+		}
+		.task {
+			// Check permission status immediately on view load
+			if permissionRequirement != .appRating {
+				let permissionStatus = await permissionRequirement.permissionStatus()
+				if permissionStatus == .gotPermission {
+					gotAccess = true
+					onSuccess()
 				}
-			)
-			.transition(.opacity)
-			// why the navigationBarTitleDisplayMode? Because we usually don't need this, but can lead to unwanted visual glitches when
-			// displaying in a NavigationStack (swiftui at first shows this view and if we got permission,
-			// will instantly switch to another)
-			.navigationBarTitleDisplayMode(.inline)
+			}
 		}
 	}
 }

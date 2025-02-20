@@ -385,7 +385,11 @@ public enum RequestType: Identifiable {
 			case .calendarAccess:
 				return {
 					do {
-						return try await EKEventStore().requestFullAccessToEvents()
+                        if #available(iOS 17.0, *) {
+                            return try await EKEventStore().requestFullAccessToEvents()
+                        } else {
+                            return false
+                        }
 					} catch {
 						return false
 					}
@@ -393,7 +397,11 @@ public enum RequestType: Identifiable {
 			case .remindersAccess:
 				return {
 					do {
-						return try await EKEventStore().requestFullAccessToReminders()
+                        if #available(iOS 17.0, *) {
+                            return try await EKEventStore().requestFullAccessToReminders()
+                        } else {
+                            return false
+                        }
 					} catch {
 						return false
 					}

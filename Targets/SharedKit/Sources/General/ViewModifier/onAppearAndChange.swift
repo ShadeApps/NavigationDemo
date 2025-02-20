@@ -13,13 +13,17 @@ extension View {
 		of value: V,
 		perform action: @escaping () -> Void
 	) -> some View where V: Equatable {
-		self
-			.onAppear {
-				action()
-			}
-			.onChange(of: value) {
-				action()
-			}
+        if #available(iOS 17.0, *) {
+            self
+                .onAppear {
+                    action()
+                }
+                .onChange(of: value) {
+                    action()
+                }
+        } else {
+            // Fallback on earlier versions
+        }
 	}
 
 }

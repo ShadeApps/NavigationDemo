@@ -37,12 +37,20 @@ public struct HeroView: View {
 
 	public var body: some View {
 		VStack {
-			Image(systemName: sfSymbolName)
-				.symbolRenderingMode(.hierarchical)
-				.foregroundStyle(Color.accentColor.gradient)
-				.font(.system(size: size == .large ? 125 : 75, weight: .semibold))
-				.padding(.bottom, size == .large ? 10 : 5)
-				.symbolEffect(.bounce, value: bounceOnChangeOfThisValue)
+            if #available(iOS 17.0, *) {
+                Image(systemName: sfSymbolName)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.accentColor.gradient)
+                    .font(.system(size: size == .large ? 125 : 75, weight: .semibold))
+                    .padding(.bottom, size == .large ? 10 : 5)
+                    .symbolEffect(.bounce, value: bounceOnChangeOfThisValue)
+            } else {
+                Image(systemName: sfSymbolName)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.accentColor.gradient)
+                    .font(.system(size: size == .large ? 125 : 75, weight: .semibold))
+                    .padding(.bottom, size == .large ? 10 : 5)
+            }
 
 			Text(title)
 				.font(.largeTitle)
