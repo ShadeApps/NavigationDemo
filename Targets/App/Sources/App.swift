@@ -18,10 +18,8 @@ struct MainApp: App {
 
 	var body: some Scene {
 		WindowGroup {
-			ContentView()
+            ContentView(viewModel: ContentViewViewModel(networkManager: NetworkManager()))
 				.modifier(ShowRequestSheetWhenNeededModifier())
-				.modifier(ShowFeatureSheetOnNewAppVersionModifier())
-				.modifier(ShowOnboardingViewOnFirstLaunchEverModifier())
 		}
 	}
 }

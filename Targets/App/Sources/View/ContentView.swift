@@ -8,39 +8,22 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var viewModel: ContentViewViewModel
+    
+    init(viewModel: ContentViewViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
 
-	var body: some View {
-		TabView {
-
-			// Pre-made Settings View for easy native-looking settings screen.
-			Tab("Settings", systemImage: "gear") {
-				SettingsView()
-			}
-
-			#if DEBUG
-
-				TabSection("DEBUG ONLY") {
-					// Use this to create quick settings and toggles to streamline the development process
-					Tab("Developer", systemImage: "hammer") {
-						DeveloperSettingsView()
-					}
-				}
-
-			#endif
-		}
-
-		.tabViewStyle(.sidebarAdaptable)
-		.tabViewSidebarHeader {
-			Text("SwiftyLaunch App")
-				.font(.title)
-				.bold()
-				.frame(maxWidth: .infinity, alignment: .leading)
-
-		}
-
-	}
+    var body: some View {
+        Button("Load quotes") {
+            Task {
+                try? await viewModel.loadQuotes()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
 }
 
 #Preview {
-	ContentView()
+    ContentView(viewModel: ContentViewViewModel(networkManager: NetworkManager()))
 }

@@ -12,8 +12,6 @@ public enum Platform {
 	case pad
 }
 
-/// Convenience wrapper around UIDevice.current.userInterfaceIdiom
-/// Note: Code provided by SwiftyLaunch only utilized this function if more than one platform is selected during project generation.
 public var currentPlatform: Platform {
 	return UIDevice.current.userInterfaceIdiom == .pad ? .pad : .phone
 }

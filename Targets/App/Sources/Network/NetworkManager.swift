@@ -8,7 +8,7 @@
 import Foundation
 
 protocol NetworkManagerProtocol {
-    func fetchQuotes(origin: Int, destination: Int, departureDateFrom: String, departureDateTo: String) async throws -> Quote
+    func fetchQuotes(origin: Int, destination: Int, departureDateFrom: String, departureDateTo: String) async throws -> QuotesResponse
     func fetchTrip(tripId: String) async throws -> Trip
 }
 
@@ -18,7 +18,54 @@ protocol NetworkSession {
 
 extension URLSession: NetworkSession {}
 
-struct Quote: Codable {}
+struct QuotesResponse: Codable {
+    let quotes: [Quote]
+}
+
+struct Quote: Codable {
+    let availability: Availability
+    let legs: [Leg]
+    let prices: Prices
+    let bookable: Bool
+    
+    struct Availability: Codable {
+        let bicycle: Int?
+        let seat: Int?
+        let wheelchair: Int?
+    }
+    
+    struct Prices: Codable {
+        let adult: Int?
+        let child: Int?
+        let bicycle: Int?
+        let wheelchair: Int?
+    }
+    
+    struct Leg: Codable {
+        let origin: Location
+        let destination: Location
+        let departure: TimeInfo
+        let arrival: TimeInfo
+        let tripUid: String
+        
+        enum CodingKeys: String, CodingKey {
+            case origin, destination, departure, arrival
+            case tripUid = "trip_uid"
+        }
+    }
+    
+    struct Location: Codable {
+        let code: String
+        let name: String
+        let lat: Double
+        let lon: Double
+    }
+    
+    struct TimeInfo: Codable {
+        let scheduled: String
+        let estimated: String?
+    }
+}
 
 struct Trip: Codable {}
 
@@ -27,6 +74,18 @@ struct QuoteRequestParams: Codable {
     let destination: Int
     let departure_date_from: String
     let departure_date_to: String
+}
+
+extension Date {
+    var iso8601String: String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.string(from: self)
+    }
+    
+    var endOfDay: Date {
+        Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: self) ?? self
+    }
 }
 
 class NetworkManager: NetworkManagerProtocol {
@@ -48,8 +107,8 @@ class NetworkManager: NetworkManagerProtocol {
 
     func fetchQuotes(origin: Int = 13,
                      destination: Int = 42,
-                     departureDateFrom: String = "2025-01-28T00:00:00Z",
-                     departureDateTo: String = "2025-01-28T23:59:59Z") async throws -> Quote {
+                     departureDateFrom: String = Date().addingTimeInterval(30 * 60).iso8601String,
+                     departureDateTo: String = Date().endOfDay.iso8601String) async throws -> QuotesResponse {
         var components = URLComponents(url: baseURL.appendingPathComponent("quotes/"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "origin", value: "\(origin)"),
@@ -70,8 +129,14 @@ class NetworkManager: NetworkManagerProtocol {
             throw URLError(.badServerResponse)
         }
 
+        if let jsonObject = try? JSONSerialization.jsonObject(with: data),
+           let prettyData = try? JSONSerialization.data(withJSONObject: jsonObject, options: .prettyPrinted),
+           let prettyString = String(data: prettyData, encoding: .utf8) {
+            print("Quotes Response:\n\(prettyString)")
+        }
+
         let decoder = JSONDecoder()
-        return try decoder.decode(Quote.self, from: data)
+        return try decoder.decode(QuotesResponse.self, from: data)
     }
 
     func fetchTrip(tripId: String) async throws -> Trip {
@@ -82,6 +147,12 @@ class NetworkManager: NetworkManagerProtocol {
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
             throw URLError(.badServerResponse)
+        }
+
+        if let jsonObject = try? JSONSerialization.jsonObject(with: data),
+           let prettyData = try? JSONSerialization.data(withJSONObject: jsonObject, options: .prettyPrinted),
+           let prettyString = String(data: prettyData, encoding: .utf8) {
+            print("Trip Response:\n\(prettyString)")
         }
 
         let decoder = JSONDecoder()
