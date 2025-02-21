@@ -48,6 +48,12 @@ struct MapView: View {
                 region.center = location.coordinate
             }
         }
+        .onChange(of: busLocation) { newBusLocation in
+            if let newBusLocation = newBusLocation {
+                region.center = newBusLocation
+                region.span = MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+            }
+        }
     }
 }
 
@@ -124,3 +130,9 @@ extension Array: @retroactive Identifiable where Element == CLLocationCoordinate
 
 // Make Vehicle Identifiable so it can be used with sheet
 extension Trip.Vehicle: Identifiable { }
+
+extension CLLocationCoordinate2D: @retroactive Equatable {
+    public static func == (lhs: CLLocationCoordinate2D, rhs: CLLocationCoordinate2D) -> Bool {
+        lhs.latitude == rhs.latitude && lhs.longitude == rhs.longitude
+    }
+}
