@@ -20,15 +20,30 @@ struct ContentView: View {
             case .idle, .loading:
                 ProgressView()
             case .error(let error):
-                Text(error.localizedDescription)
-                    .foregroundColor(.red)
-                    .multilineTextAlignment(.center)
-                    .padding()
-            case .loaded(let quotes):
-                MapView(quotes: quotes, centerOnQuote: quotes.first)
+                VStack(spacing: 16) {
+                    Text(error.localizedDescription)
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                    
+                    Button(action: {
+                        Task {
+                            await viewModel.loadQuotes()
+                        }
+                    }) {
+                        Label("Try Again", systemImage: "arrow.clockwise")
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.accentColor)
+                            .cornerRadius(8)
+                    }
+                }
+                .padding()
+            case .loaded(let trip):
+                MapView(trip: trip)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
         .requireCapabilityPermission(of: .locationAccess) {
             // On successful permission granted
             Task {
@@ -37,9 +52,6 @@ struct ContentView: View {
         } onCancel: {
             // On permission denied
             // Probably add error to logs, no need to bother the user
-        }
-        .task {
-            await viewModel.loadQuotes()
         }
     }
 }

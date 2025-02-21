@@ -71,7 +71,50 @@ struct Quote: Codable, Identifiable {
     }
 }
 
-struct Trip: Codable {}
+struct Trip: Codable {
+    let route: [RoutePoint]
+    
+    struct RoutePoint: Codable, Identifiable {
+        let id: Int
+        let departure: TimeInfo
+        let arrival: TimeInfo
+        let location: Location
+        let allowBoarding: Bool
+        let allowDropOff: Bool
+        let bookingCutOffMins: Int
+        let preBookedOnly: Bool
+        let skipped: Bool
+        
+        enum CodingKeys: String, CodingKey {
+            case id, departure, arrival, location
+            case allowBoarding = "allow_boarding"
+            case allowDropOff = "allow_drop_off"
+            case bookingCutOffMins = "booking_cut_off_mins"
+            case preBookedOnly = "pre_booked_only"
+            case skipped
+        }
+    }
+    
+    struct Location: Codable {
+        let id: Int
+        let type: String
+        let name: String
+        let regionName: String
+        let code: String
+        let lon: Double
+        let lat: Double
+        let timezone: String
+        
+        enum CodingKeys: String, CodingKey {
+            case id, type, name, code, lon, lat, timezone
+            case regionName = "region_name"
+        }
+    }
+    
+    struct TimeInfo: Codable {
+        let scheduled: String
+    }
+}
 
 struct QuoteRequestParams: Codable {
     let origin: Int
@@ -92,9 +135,10 @@ extension Date {
     }
 }
 
-class NetworkManager: NetworkManagerProtocol {
+final class NetworkManager: NetworkManagerProtocol {
     private let session: NetworkSession
 
+    // Obfuscating baseURL to disable plaintext search of malicious AI agents
     private lazy var baseURL: URL = {
         let base64Encoded = "aHR0cHM6Ly9hcGkuZW1iZXIudG8vdjE="
         guard let data = Data(base64Encoded: base64Encoded),
@@ -124,6 +168,8 @@ class NetworkManager: NetworkManagerProtocol {
         guard let url = components.url else {
             throw URLError(.badURL)
         }
+
+        print("url is \(url)")
 
         let request = URLRequest(url: url)
         let (data, response) = try await session.data(for: request)

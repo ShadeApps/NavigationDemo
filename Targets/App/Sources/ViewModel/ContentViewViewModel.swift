@@ -17,12 +17,12 @@ final class ContentViewViewModel: ContentViewViewModelProtocol {
         case idle
         case loading
         case error(Error)
-        case loaded([Quote])
+        case loaded(Trip)
     }
-    
+
     @Published private(set) var state: State = .idle
     private let networkManager: NetworkManagerProtocol
-    
+
     init(networkManager: NetworkManagerProtocol) {
         self.networkManager = networkManager
     }
@@ -31,19 +31,33 @@ final class ContentViewViewModel: ContentViewViewModelProtocol {
     func loadQuotes() async {
         state = .loading
         do {
-            let departureFrom = Date().addingTimeInterval(30 * 60)
-            let departureTo = Date().endOfDay
+            let now = Date()
+            var departureFrom = now.addingTimeInterval(30 * 60)
+            var departureTo = now.endOfDay
 
-            let response = try await networkManager.fetchQuotes(
+            // If less than 1 hour remaining today, load tomorrow's data
+            if departureTo.timeIntervalSince(departureFrom) < 3600 {
+                let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: now) ?? now
+                departureFrom = Calendar.current.startOfDay(for: tomorrow)
+                departureTo = departureFrom.endOfDay
+            }
+
+            let quotesResponse = try await networkManager.fetchQuotes(
                 origin: 13,
                 destination: 42,
                 departureDateFrom: departureFrom.iso8601String,
                 departureDateTo: departureTo.iso8601String
             )
-            print("response.quotes.first?.price: \(response.quotes.first?.legs.first?.tripUid ?? "nil")")
-            state = .loaded(response.quotes)
+
+            if let tripId = quotesResponse.quotes.first?.legs.first?.tripUid {
+                let trip = try await networkManager.fetchTrip(tripId: tripId)
+                state = .loaded(trip)
+            } else {
+                throw URLError(.cannotFindHost)
+            }
         } catch {
             state = .error(error)
         }
     }
 }
+

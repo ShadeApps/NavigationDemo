@@ -7,49 +7,34 @@
 
 import SwiftUI
 import MapKit
-import CoreLocation
 
 struct MapView: View {
-    let quotes: [Quote]
-    @State private var selectedQuote: Quote?
+    let trip: Trip
+    @State private var selectedPoint: Trip.RoutePoint?
     @State private var region: MKCoordinateRegion
     @StateObject private var locationManager = LocationManager()
-    
-    init(quotes: [Quote], centerOnQuote: Quote? = nil) {
-        self.quotes = quotes
-        
-        // Center on the provided quote, or first quote, or default to 0,0
-        let initialQuote = centerOnQuote ?? quotes.first
-        let latitude = initialQuote?.legs.first?.origin.lat ?? 0
-        let longitude = initialQuote?.legs.first?.origin.lon ?? 0
-        
+
+    init(trip: Trip) {
+        self.trip = trip
+        let firstPoint = trip.route.first
+        let initialLatitude = firstPoint?.location.lat ?? 0
+        let initialLongitude = firstPoint?.location.lon ?? 0
         _region = State(initialValue: MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
+            center: CLLocationCoordinate2D(latitude: initialLatitude, longitude: initialLongitude),
             span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5)
         ))
     }
-    
+
     var body: some View {
-        Map(coordinateRegion: $region, showsUserLocation: true, annotationItems: quotes) { quote in
-            MapAnnotation(coordinate: CLLocationCoordinate2D(
-                latitude: quote.legs.first?.origin.lat ?? 0,
-                longitude: quote.legs.first?.origin.lon ?? 0
-            )) {
-                Image(systemName: "mappin.circle.fill")
-                    .foregroundColor(.red)
-                    .onTapGesture {
-                        selectedQuote = quote
-                    }
+        UIKitMapView(trip: trip, region: $region, selectedPoint: $selectedPoint)
+            .sheet(item: $selectedPoint) { point in
+                RoutePointDetailView(point: point)
             }
-        }
-        .sheet(item: $selectedQuote) { quote in
-            QuoteDetailView(quote: quote)
-        }
-        .onChange(of: locationManager.location) { location in
-            if let location = location {
-                region.center = location.coordinate
+            .onChange(of: locationManager.location) { location in
+                if let location = location {
+                    region.center = location.coordinate
+                }
             }
-        }
     }
 }
 
@@ -69,36 +54,45 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
 }
 
-struct QuoteDetailView: View {
-    let quote: Quote
+struct RoutePointDetailView: View {
+    let point: Trip.RoutePoint
     @Environment(\.dismiss) var dismiss
+    
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+    
+    private func formatDate(_ iso8601String: String) -> String {
+        guard let date = ISO8601DateFormatter().date(from: iso8601String) else {
+            return iso8601String
+        }
+        return dateFormatter.string(from: date)
+    }
     
     var body: some View {
         NavigationView {
             List {
-                Section("Route") {
-                    ForEach(quote.legs, id: \.tripUid) { leg in
-                        VStack(alignment: .leading) {
-                            Text(leg.origin.name)
-                            Text("↓")
-                            Text(leg.destination.name)
-                        }
-                    }
+                Section("Location") {
+                    Text(point.location.name)
+                    Text(point.location.regionName)
                 }
                 
-                if let prices = quote.prices.adult {
-                    Section("Price") {
-                        Text("Adult: \(prices)")
-                    }
+                Section("Schedule") {
+                    Text("Departure: \(formatDate(point.departure.scheduled))")
+                    Text("Arrival: \(formatDate(point.arrival.scheduled))")
                 }
                 
-                if let seats = quote.availability.seat {
-                    Section("Availability") {
-                        Text("Seats: \(seats)")
+                Section("Status") {
+                    Text("Boarding: \(point.allowBoarding ? "Yes" : "No")")
+                    Text("Drop-off: \(point.allowDropOff ? "Yes" : "No")")
+                    if point.preBookedOnly {
+                        Text("Pre-booking required")
                     }
                 }
             }
-            .navigationTitle("Quote Details")
+            .navigationTitle("Stop Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 Button("Close") {
@@ -106,5 +100,11 @@ struct QuoteDetailView: View {
                 }
             }
         }
+    }
+}
+
+extension Array: @retroactive Identifiable where Element == CLLocationCoordinate2D {
+    public var id: String {
+        map { "\($0.latitude),\($0.longitude)" }.joined()
     }
 }

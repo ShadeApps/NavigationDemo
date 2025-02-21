@@ -90,7 +90,7 @@ public enum RequestType: Identifiable {
 				return RequestTypeData(
 					sfSymbolName: "location.fill.viewfinder",
 					title: "Allow Location Access?",
-					subtitle: "With Access to your Location,\nwe can do cool stuff.",
+					subtitle: "With Access to your Location,\nwe can show your position on the map.",
 					footerNote: "We won't spy on you, we promise.",
 					ctaText: "Allow Location Access"
 				)
