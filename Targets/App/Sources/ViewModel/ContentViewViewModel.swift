@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import MapKit
 
 protocol ContentViewViewModelProtocol: ObservableObject {
     var state: ContentViewViewModel.State { get }
@@ -21,7 +22,11 @@ final class ContentViewViewModel: ContentViewViewModelProtocol {
     }
 
     @Published private(set) var state: State = .idle
+    @Published private(set) var busLocation: CLLocationCoordinate2D?
     private let networkManager: NetworkManagerProtocol
+
+    @MainActor
+    private var locationUpdateTask: Task<Void, Never>?
 
     init(networkManager: NetworkManagerProtocol) {
         self.networkManager = networkManager
@@ -52,11 +57,32 @@ final class ContentViewViewModel: ContentViewViewModelProtocol {
             if let tripId = quotesResponse.quotes.first?.legs.first?.tripUid {
                 let trip = try await networkManager.fetchTrip(tripId: tripId)
                 state = .loaded(trip)
+                startBusLocationUpdates(tripId: tripId)
             } else {
                 throw URLError(.cannotFindHost)
             }
         } catch {
             state = .error(error)
+        }
+    }
+
+    @MainActor func startBusLocationUpdates(tripId: String) {
+        locationUpdateTask?.cancel()
+        locationUpdateTask = Task {
+            while !Task.isCancelled {
+                do {
+                    let updatedTrip = try await networkManager.fetchTrip(tripId: tripId)
+                    if let vehicle = updatedTrip.vehicle {
+                        busLocation = CLLocationCoordinate2D(
+                            latitude: vehicle.gps.latitude,
+                            longitude: vehicle.gps.longitude
+                        )
+                    }
+                } catch {
+                    // handle error if needed
+                }
+                try? await Task.sleep(nanoseconds: 60 * 1_000_000_000)
+            }
         }
     }
 }

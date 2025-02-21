@@ -10,15 +10,20 @@ import MapKit
 
 struct MapView: View {
     let trip: Trip
+    let busLocation: CLLocationCoordinate2D?
     @State private var selectedPoint: Trip.RoutePoint?
+    @State private var selectedVehicle: Trip.Vehicle?
     @State private var region: MKCoordinateRegion
     @StateObject private var locationManager = LocationManager()
 
-    init(trip: Trip) {
+    init(trip: Trip, busLocation: CLLocationCoordinate2D? = nil) {
         self.trip = trip
+        self.busLocation = busLocation
+        
         let firstPoint = trip.route.first
         let initialLatitude = firstPoint?.location.lat ?? 0
         let initialLongitude = firstPoint?.location.lon ?? 0
+        
         _region = State(initialValue: MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: initialLatitude, longitude: initialLongitude),
             span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5)
@@ -26,19 +31,27 @@ struct MapView: View {
     }
 
     var body: some View {
-        UIKitMapView(trip: trip, region: $region, selectedPoint: $selectedPoint)
-            .sheet(item: $selectedPoint) { point in
-                RoutePointDetailView(point: point)
+        UIKitMapView(
+            trip: trip,
+            region: $region,
+            selectedPoint: $selectedPoint,
+            selectedVehicle: $selectedVehicle
+        )
+        .sheet(item: $selectedPoint) { point in
+            RoutePointDetailView(point: point)
+        }
+        .sheet(item: $selectedVehicle) { vehicle in
+            BusDetailView(vehicle: vehicle)
+        }
+        .onChange(of: locationManager.location) { location in
+            if let location = location {
+                region.center = location.coordinate
             }
-            .onChange(of: locationManager.location) { location in
-                if let location = location {
-                    region.center = location.coordinate
-                }
-            }
+        }
     }
 }
 
-class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
+final class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     @Published var location: CLLocation?
     
@@ -108,3 +121,6 @@ extension Array: @retroactive Identifiable where Element == CLLocationCoordinate
         map { "\($0.latitude),\($0.longitude)" }.joined()
     }
 }
+
+// Make Vehicle Identifiable so it can be used with sheet
+extension Trip.Vehicle: Identifiable { }

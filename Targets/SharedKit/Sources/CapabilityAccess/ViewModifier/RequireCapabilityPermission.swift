@@ -9,11 +9,13 @@ import SwiftUI
 
 struct RequireCapabilityPermissionViewModifier: ViewModifier {
 
+    @Environment(\.dismiss) private var dismiss
 	@Environment(\.scenePhase) var scenePhase
 	let permissionRequirement: RequestType
 	let onSuccess: () -> Void  //means we got the permission
 	let onCancel: () -> Void  //means we didn't get the permission
 	@State var gotAccess = false
+	@State private var showRequestSheet = false
 
 	init(permissionRequirement: RequestType, onSuccess: @escaping () -> Void, onCancel: @escaping () -> Void) {
 		self.permissionRequirement = permissionRequirement
@@ -22,41 +24,50 @@ struct RequireCapabilityPermissionViewModifier: ViewModifier {
 	}
 
 	func body(content: Content) -> some View {
-		Group {
-			if gotAccess {
-				content
-					.onAppearAndChange(of: scenePhase) {
-						if permissionRequirement == .appRating { return }
-
-						Task {
-							let permissionStatus = await permissionRequirement.permissionStatus()
-							
-							/// Update access state without animation
-							gotAccess = permissionStatus == .gotPermission
+		content
+			.overlay {
+				if !gotAccess {
+					// Trigger the modal sheet presentation
+					Color.clear
+						.sheet(isPresented: $showRequestSheet, onDismiss: {
+							// If dismissed without granting, notify onCancel
+							onCancel()
+						}) {
+							RequestCapabilityContentView(
+								type: permissionRequirement,
+								onSuccessfulAccept: {
+									gotAccess = true
+									showRequestSheet = false
+									onSuccess()
+								},
+								onDismiss: {
+									showRequestSheet = false
+									onCancel()
+								}
+							)
+							.navigationBarTitleDisplayMode(.inline)
 						}
-					}
-			} else {
-				RequestCapabilityContentView(
-					type: permissionRequirement,
-					onSuccessfulAccept: {
-						gotAccess = true
-						onSuccess()
-					},
-					onDismiss: onCancel
-				)
-				.navigationBarTitleDisplayMode(.inline)
-			}
-		}
-		.task {
-			// Check permission status immediately on view load
-			if permissionRequirement != .appRating {
-				let permissionStatus = await permissionRequirement.permissionStatus()
-				if permissionStatus == .gotPermission {
-					gotAccess = true
-					onSuccess()
+						.onAppear {
+							showRequestSheet = true
+						}
 				}
 			}
-		}
+			.onAppearAndChange(of: scenePhase) {
+				if permissionRequirement == .appRating { return }
+				Task {
+					let permissionStatus = await permissionRequirement.permissionStatus()
+					gotAccess = permissionStatus == .gotPermission
+				}
+			}
+			.task {
+				if permissionRequirement != .appRating {
+					let permissionStatus = await permissionRequirement.permissionStatus()
+					if permissionStatus == .gotPermission {
+						gotAccess = true
+						onSuccess()
+					}
+				}
+			}
 	}
 }
 

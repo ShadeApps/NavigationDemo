@@ -9,7 +9,8 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var viewModel: ContentViewViewModel
-    
+    @Environment(\.dismiss) private var dismiss
+
     init(viewModel: ContentViewViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
@@ -24,7 +25,7 @@ struct ContentView: View {
                     Text(error.localizedDescription)
                         .foregroundColor(.red)
                         .multilineTextAlignment(.center)
-                    
+
                     Button(action: {
                         Task {
                             await viewModel.loadQuotes()
@@ -39,7 +40,7 @@ struct ContentView: View {
                 }
                 .padding()
             case .loaded(let trip):
-                MapView(trip: trip)
+                MapView(trip: trip, busLocation: viewModel.busLocation)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -50,8 +51,11 @@ struct ContentView: View {
                 await viewModel.loadQuotes()
             }
         } onCancel: {
-            // On permission denied
-            // Probably add error to logs, no need to bother the user
+            dismiss()
+
+            Task {
+                await viewModel.loadQuotes()
+            }
         }
     }
 }

@@ -10,7 +10,7 @@ import MapKit
 import CoreLocation
 
 // Custom annotation subclass to store a Trip.RoutePoint.
-class TripAnnotation: MKPointAnnotation {
+final class TripAnnotation: MKPointAnnotation {
     let routePoint: Trip.RoutePoint
     init(routePoint: Trip.RoutePoint) {
         self.routePoint = routePoint
@@ -21,11 +21,65 @@ class TripAnnotation: MKPointAnnotation {
     }
 }
 
+final class BusAnnotation: MKPointAnnotation {
+    let vehicle: Trip.Vehicle
+    
+    init(vehicle: Trip.Vehicle) {
+        self.vehicle = vehicle
+        super.init()
+        self.coordinate = CLLocationCoordinate2D(
+            latitude: vehicle.gps.latitude,
+            longitude: vehicle.gps.longitude
+        )
+        self.title = vehicle.name
+    }
+}
+
+struct BusDetailView: View {
+    let vehicle: Trip.Vehicle
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            List {
+                Section("Vehicle Info") {
+                    Text("Name: \(vehicle.name)")
+                    Text("Plate: \(vehicle.plateNumber)")
+                    Text("Type: \(vehicle.type.capitalized)")
+                }
+                
+                Section("Capacity") {
+                    Text("Seats: \(vehicle.seat)")
+                    Text("Bicycles: \(vehicle.bicycle)")
+                    Text("Wheelchairs: \(vehicle.wheelchair)")
+                }
+                
+                Section("Features") {
+                    if vehicle.hasWifi {
+                        Label("WiFi Available", systemImage: "wifi")
+                    }
+                    if vehicle.hasToilet {
+                        Label("Toilet Available", systemImage: "toilet")
+                    }
+                }
+            }
+            .navigationTitle("Vehicle Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                Button("Close") {
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
 // A UIViewRepresentable that wraps an MKMapView.
 struct UIKitMapView: UIViewRepresentable {
     let trip: Trip
     @Binding var region: MKCoordinateRegion
     @Binding var selectedPoint: Trip.RoutePoint?
+    @Binding var selectedVehicle: Trip.Vehicle?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -61,6 +115,11 @@ struct UIKitMapView: UIViewRepresentable {
             let polyline = MKPolyline(coordinates: coordinates, count: coordinates.count)
             mapView.addOverlay(polyline)
         }
+        
+        if let vehicle = trip.vehicle {
+            let busAnnotation = BusAnnotation(vehicle: vehicle)
+            mapView.addAnnotation(busAnnotation)
+        }
     }
 
     class Coordinator: NSObject, MKMapViewDelegate {
@@ -70,11 +129,10 @@ struct UIKitMapView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            // Let the system handle the user location annotation.
             if annotation is MKUserLocation {
                 return nil
             }
-            let identifier = "TripAnnotationView"
+            let identifier = "AnnotationView"
             var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier)
             if annotationView == nil {
                 annotationView = MKAnnotationView(annotation: annotation, reuseIdentifier: identifier)
@@ -83,17 +141,18 @@ struct UIKitMapView: UIViewRepresentable {
                 annotationView?.annotation = annotation
             }
             if let tripAnnotation = annotation as? TripAnnotation {
-                // Set the desired color based on allowBoarding.
                 let color: UIColor = tripAnnotation.routePoint.allowBoarding ? .systemGreen : .systemRed
                 if let image = UIImage(systemName: "mappin.circle.fill") {
-                    // Use the extension to fill the image with the color.
                     annotationView?.image = image.fill(with: color)
+                }
+            } else if let _ = annotation as? BusAnnotation {
+                if let image = UIImage(systemName: "bus.fill") {
+                    annotationView?.image = image.fill(with: .blue)
                 }
             }
             return annotationView
         }
 
-        // Render the polyline overlay.
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
@@ -108,6 +167,8 @@ struct UIKitMapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
             if let tripAnnotation = view.annotation as? TripAnnotation {
                 parent.selectedPoint = tripAnnotation.routePoint
+            } else if let busAnnotation = view.annotation as? BusAnnotation {
+                parent.selectedVehicle = busAnnotation.vehicle
             }
         }
     }

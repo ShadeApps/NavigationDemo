@@ -73,6 +73,7 @@ struct Quote: Codable, Identifiable {
 
 struct Trip: Codable {
     let route: [RoutePoint]
+    let vehicle: Vehicle?
     
     struct RoutePoint: Codable, Identifiable {
         let id: Int
@@ -113,6 +114,45 @@ struct Trip: Codable {
     
     struct TimeInfo: Codable {
         let scheduled: String
+    }
+    
+    struct Vehicle: Codable {
+        let bicycle: Int
+        let wheelchair: Int
+        let seat: Int
+        let id: Int
+        let plateNumber: String
+        let name: String
+        let hasWifi: Bool
+        let hasToilet: Bool
+        let type: String
+        let brand: String
+        let colour: String
+        let isBackupVehicle: Bool
+        let ownerId: Int
+        let gps: GPS
+        
+        enum CodingKeys: String, CodingKey {
+            case bicycle, wheelchair, seat, id, name, type, brand, colour
+            case plateNumber = "plate_number"
+            case hasWifi = "has_wifi"
+            case hasToilet = "has_toilet"
+            case isBackupVehicle = "is_backup_vehicle"
+            case ownerId = "owner_id"
+            case gps
+        }
+        
+        struct GPS: Codable {
+            let lastUpdated: String
+            let longitude: Double
+            let latitude: Double
+            let heading: Int
+            
+            enum CodingKeys: String, CodingKey {
+                case longitude, latitude, heading
+                case lastUpdated = "last_updated"
+            }
+        }
     }
 }
 
@@ -169,20 +209,12 @@ final class NetworkManager: NetworkManagerProtocol {
             throw URLError(.badURL)
         }
 
-        print("url is \(url)")
-
         let request = URLRequest(url: url)
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
             throw URLError(.badServerResponse)
-        }
-
-        if let jsonObject = try? JSONSerialization.jsonObject(with: data),
-           let prettyData = try? JSONSerialization.data(withJSONObject: jsonObject, options: .prettyPrinted),
-           let prettyString = String(data: prettyData, encoding: .utf8) {
-            print("Quotes Response:\n\(prettyString)")
         }
 
         let decoder = JSONDecoder()
@@ -197,12 +229,6 @@ final class NetworkManager: NetworkManagerProtocol {
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
             throw URLError(.badServerResponse)
-        }
-
-        if let jsonObject = try? JSONSerialization.jsonObject(with: data),
-           let prettyData = try? JSONSerialization.data(withJSONObject: jsonObject, options: .prettyPrinted),
-           let prettyString = String(data: prettyData, encoding: .utf8) {
-            print("Trip Response:\n\(prettyString)")
         }
 
         let decoder = JSONDecoder()
